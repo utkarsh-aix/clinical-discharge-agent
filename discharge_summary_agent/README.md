@@ -4,6 +4,43 @@ A robust, multi-step agentic AI system for generating structured, clinically saf
 
 ---
 
+## 🛠️ Tech Stack
+
+- **Core Language**: Python 3.10+
+- **Agent Framework & LLM**: Google Gemini API via `google-generativeai` (utilizing `gemini-2.5-flash` for agent planning and medical extraction)
+- **Web Dashboard**: Flask (Python backend) with high-fidelity custom HTML5/CSS3 dark-themed front-end (glassmorphism UI, real-time agent execution tracking)
+- **OCR & Document Parsing**: Tesseract OCR (`pytesseract`), Poppler (`pdf2image`), `pdfplumber`, and `PyPDF2`
+- **Safety & Robustness**: Pydantic (schema/data structure validation) and Tenacity (resilient LLM API call retries)
+
+---
+
+## 🖥️ Dashboard UI Screenshots
+
+Here are some screenshots of the interactive web dashboard:
+
+### 1. Document Analysis & Execution Trace
+Shows the real-time planner running through its multi-step agentic loop and reporting reasoning logs.
+![Document Analysis](screenshots/dashboard_analysis.png)
+
+### 2. Main Dashboard & Patient Info
+Visual overview of demographics, extracted diagnoses, and metrics including steps taken, conflicts found, and procedures completed.
+![Main Dashboard](screenshots/dashboard_main.png)
+
+### 3. Key Investigations
+Extracts, structures, and maps lab results and vital statistics into clear tabular formats.
+![Key Investigations](screenshots/dashboard_investigations.png)
+
+### 4. Medications, Procedures & Discharge Info
+Captures all prescriptions, route, frequency, and duration alongside critical follow-up plans.
+![Medications and Procedures](screenshots/dashboard_meds_procedures.png)
+
+### 5. Clinical Safety & Conflicts Panel
+Highlights cross-document inconsistencies (LAMA status, diagnosis mismatches) and medication reconciliation flags for direct clinician review.
+![Clinical Safety](screenshots/dashboard_conflicts.png)
+
+---
+
+
 ## 🚀 How to Run
 
 ### 1. Install System Dependencies
