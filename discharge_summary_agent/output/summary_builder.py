@@ -153,7 +153,7 @@ Secondary Diagnoses:
 {secondary_dx}
 
 ━━━ HOSPITAL COURSE ━━━
-{fmt(state.hospital_course, "See source notes - hospital course not auto-extracted")}
+{fmt(state.hospital_course, "[MISSING — Hospital course not documented in source notes — ⚠️ FLAG FOR CLINICIAN REVIEW]")}
 
 ━━━ PROCEDURES PERFORMED ━━━
 {procedures}
@@ -168,7 +168,7 @@ Secondary Diagnoses:
 {recon_text}
 
 ━━━ ALLERGIES ━━━
-{fmt(state.allergies, "Not Known / Not Documented")}
+{state.allergies if state.allergies else "[NOT DOCUMENTED — ⚠️ Verify with patient / source notes before finalising discharge]"}
 
 ━━━ DISCHARGE CONDITION ━━━
 {fmt(state.discharge_condition)}

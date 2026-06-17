@@ -11,8 +11,7 @@ from output.html_report import generate_html_report
 def run_patient(patient_folder: str, patient_id: str, max_steps: int = 25):
     print(f"\n🏥 Discharge Summary Agent — {patient_id}")
     print(f"📁 Folder: {patient_folder}")
-    model_name = "gemini-2.5-flash" if os.getenv("GEMINI_API_KEY") else os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
-    print(f"🤖 Model: {model_name}")
+    print("🤖 Model: Clinical AI (Fallback Enabled)")
     print("=" * 60)
 
     agent = DischargeAgent(patient_folder, patient_id, max_steps)
@@ -32,6 +31,11 @@ def run_patient(patient_folder: str, patient_id: str, max_steps: int = 25):
     # Save trace
     trace_path = f"outputs/{patient_id}_trace.json"
     agent.tracer.export_trace(trace_path)
+
+    # Save state pickle
+    import pickle
+    with open(f"outputs/{patient_id}_state.pkl", "wb") as f:
+        pickle.dump(state, f)
 
     print(f"\n{'='*60}")
     print(f"✅ Status:    {state.status}")

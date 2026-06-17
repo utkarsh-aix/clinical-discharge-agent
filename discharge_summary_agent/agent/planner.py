@@ -1,47 +1,43 @@
 """
-Planner — decides which tools and extractors to invoke at each step,
-using the Groq LLM to reason over the current agent state.
+Planner — state-machine based planning for the discharge summary agent.
+
+Design Decision:
+  The planner uses a deterministic state-machine approach (implemented in
+  DischargeAgent.plan() inside agent/loop.py) rather than an LLM-based
+  dynamic planner. This is intentional for a clinical context where:
+
+    - Reliability and reproducibility matter more than flexibility.
+      Every run on the same patient data must produce the same extraction
+      order, making audits and debugging straightforward.
+
+    - The extraction pipeline has a well-defined set of steps with clear
+      dependencies (e.g. medication reconciliation requires medications to
+      be extracted first; conflict detection is more useful after
+      reconciliation so it can surface stopped-medication conflicts).
+
+    - An LLM planner would add non-determinism and extra API calls with
+      no clinical benefit for a fixed, well-understood workflow.
+
+  DischargeAgent.plan() IS the planner — it inspects the AgentState after
+  every tool execution and routes to the next appropriate tool based on
+  which state fields are still None (not yet attempted).
 """
 
-from groq import Groq
+# Canonical execution order used by DischargeAgent.plan()
+EXTRACTION_ORDER = [
+    "read_pdfs",
+    "extract_demographics",
+    "extract_diagnoses",
+    "extract_medications",
+    "extract_labs",
+    "extract_procedures",
+    "extract_discharge_info",
+    "extract_hospital_course",
+    "reconcile_medications",
+    "detect_conflicts",
+    "check_drug_interactions",
+    "escalate_conflicts",
+    "build_summary",
+    "verify_summary",
+]
 
-
-class Planner:
-    """LLM-backed planner that generates the next action for the agent loop."""
-
-    def __init__(self, api_key: str, model: str):
-        self.client = Groq(api_key=api_key)
-        self.model = model
-
-    def plan_next_step(self, state_summary: str) -> dict:
-        """
-        Given a summary of the current agent state, decide the next action.
-
-        Args:
-            state_summary: A text description of what has been done so far.
-
-        Returns:
-            A dict with keys 'action' and optional 'params'.
-        """
-        # TODO: Implement LLM-based planning
-        raise NotImplementedError("Planner.plan_next_step not yet implemented")
-
-    def decide_extraction_order(self, available_pages: list[str]) -> list[str]:
-        """
-        Decide which extractors to run and in what order.
-
-        Args:
-            available_pages: List of text content from each PDF page.
-
-        Returns:
-            Ordered list of extractor names to invoke.
-        """
-        # Default extraction order
-        return [
-            "demographics",
-            "diagnoses",
-            "medications",
-            "labs",
-            "procedures",
-            "discharge_info",
-        ]

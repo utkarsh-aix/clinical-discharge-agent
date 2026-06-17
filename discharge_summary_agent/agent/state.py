@@ -22,6 +22,7 @@ class AgentState:
     principal_diagnosis: Optional[str] = None
     secondary_diagnoses: Optional[list] = None
     hospital_course: Optional[str] = None
+    hospital_course_events: Optional[list] = None
     procedures: Optional[list] = None
     admission_medications: Optional[list] = None
     discharge_medications: Optional[list] = None
@@ -47,3 +48,9 @@ class AgentState:
     status: str = "running"              # running | complete | failed | max_steps_reached
     final_summary: Optional[str] = None
     started_at: str = field(default_factory=lambda: datetime.now().isoformat())
+
+    # Phase 2 — Learning metrics (populated after reviewer runs)
+    phase2_score: Optional[dict] = None  # {ned, smr, confirmed_rules}
+
+    # Improvement 1 — OCR quality (populated during read_pdfs)
+    ocr_confidence: Optional[float] = None  # 0–100, mean across all pages

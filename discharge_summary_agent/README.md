@@ -1,111 +1,166 @@
-# Discharge Summary Agent
+# CliniDraft AI
 
-A robust, multi-step agentic AI system for generating structured, clinically safe discharge summaries from patient PDF records. Powered by **Google Gemini (`gemini-2.5-flash`)**.
+An intelligent medical assistant that automates the generation of patient discharge summaries from clinical documents.
 
----
+[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-## 🛠️ Tech Stack
+Links:
+* [Repository](https://github.com/utkarsh-aix/clinical-discharge-agent)
 
-- **Core Language**: Python 3.10+
-- **Agent Framework & LLM**: Google Gemini API via `google-generativeai` (utilizing `gemini-2.5-flash` for agent planning and medical extraction)
-- **Web Dashboard**: Flask (Python backend) with high-fidelity custom HTML5/CSS3 dark-themed front-end (glassmorphism UI, real-time agent execution tracking)
-- **OCR & Document Parsing**: Tesseract OCR (`pytesseract`), Poppler (`pdf2image`), `pdfplumber`, and `PyPDF2`
-- **Safety & Robustness**: Pydantic (schema/data structure validation) and Tenacity (resilient LLM API call retries)
+## Why This Exists
 
----
+Writing patient discharge summaries manually from fragmented clinical notes, laboratory reports, and hospital charts is time-consuming and error-prone. Inaccuracies or missed data can lead to poor transition of care and medication errors.
 
-## 🖥️ Dashboard UI Screenshots
+CliniDraft AI solves this by deploying a deterministic state-machine agent powered by Google Gemini (`gemini-2.5-flash`). It parses patient records, extracts structured clinical information, audits for inconsistencies, and drafts print-ready summaries for clinician review.
 
-Here are some screenshots of the interactive web dashboard:
+## Features
 
-### 1. Document Analysis & Execution Trace
-Shows the real-time planner running through its multi-step agentic loop and reporting reasoning logs.
-![Document Analysis](screenshots/dashboard_analysis.png)
+* **Deterministic Agent Loop:** A multi-step state machine that ensures structured and repeatable data extraction.
+* **Clinical Safety Guardrails:** Strict instructions to prevent data fabrication. Missing fields are left for clinician validation.
+* **Conflict & Inconsistency Detector:** Scans across admission notes, progress updates, and labs to flag discrepancies in dates, diagnoses, or medication reconciliations.
+* **Multi-Fallback OCR Pipeline:** Robust parsing of digital and scanned PDFs utilizing `pdfplumber`, Tesseract OCR, EasyOCR, and Gemini Vision.
+* **Interactive Clinician Dashboard:** A clean, steel-blue interface featuring live execution logs, patient analytics, and warning notifications.
+* **Print-Ready Exports:** Instantly generate professional HTML and PDF summaries for patient handoff.
+* **Simulated Doctor Review:** A closed loop that computes edit distances and refines future drafts through persistent memory.
 
-### 2. Main Dashboard & Patient Info
+## Screenshots
+
+### 1. Document Upload Page
+Provides a simple web portal for uploading single patient PDFs or ZIP archives containing multi-document patient records.
+![Document Upload Page](screenshots/document_upload.png)
+
+### 2. Document Analysis & Execution Trace
+Displays the real-time planner running through its multi-step agentic loop and reporting reasoning logs.
+![Document Analysis](screenshots/document_analysis.png)
+
+### 3. Main Dashboard & Patient Info Page
 Visual overview of demographics, extracted diagnoses, and metrics including steps taken, conflicts found, and procedures completed.
 ![Main Dashboard](screenshots/dashboard_main.png)
 
-### 3. Key Investigations
+### 4. Key Investigations Page
 Extracts, structures, and maps lab results and vital statistics into clear tabular formats.
 ![Key Investigations](screenshots/dashboard_investigations.png)
 
-### 4. Medications, Procedures & Discharge Info
+### 5. Medications, Procedures & Discharge Info Page
 Captures all prescriptions, route, frequency, and duration alongside critical follow-up plans.
 ![Medications and Procedures](screenshots/dashboard_meds_procedures.png)
 
-### 5. Clinical Safety & Conflicts Panel
+### 6. Clinical Safety & Conflicts Panel
 Highlights cross-document inconsistencies (LAMA status, diagnosis mismatches) and medication reconciliation flags for direct clinician review.
 ![Clinical Safety](screenshots/dashboard_conflicts.png)
 
----
+## Tech Stack
 
+* **Language:** Python 3.10+
+* **LLM & Orchestration:** Google Gemini API (`google-generativeai`)
+* **Web Dashboard:** Flask, HTML5, CSS3 (Steel-blue light theme)
+* **Document Processing:** Tesseract OCR (`pytesseract`), Poppler (`pdf2image`), `pdfplumber`, `PyPDF2`, `EasyOCR`
+* **Resilience:** Tenacity (retries with exponential backoff)
+* **Report Generation:** ReportLab (print-ready PDF exports)
 
-## 🚀 How to Run
+## Quick Start
 
-### 1. Install System Dependencies
-Install OCR and PDF rendering tools:
+### Clone
+
+```bash
+git clone https://github.com/utkarsh-aix/clinical-discharge-agent.git
+cd clinical-discharge-agent/discharge_summary_agent
+```
+
+### Install
+
+Ensure you have `tesseract-ocr` and `poppler-utils` installed on your system.
+
+**Linux:**
 ```bash
 sudo apt update && sudo apt install -y tesseract-ocr poppler-utils
 ```
 
-### 2. Install Python Packages
+Install Python packages:
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Configure the Environment
-Create a `.env` file at the root of the project:
+### Configure Environment
+
+Create a `.env` file in the root of the `discharge_summary_agent` directory:
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
-### 4. Run the Web Dashboard
+### Run
+
+#### Start Web Interface:
 ```bash
 python3 app.py
 ```
-Open **`http://localhost:5000`** in your browser.
+Open [http://localhost:5000](http://localhost:5000) in your browser.
 
-### 5. Run via CLI
+#### Start via CLI (for multi-document folders):
 ```bash
 python3 main.py --patient-folder patients/patient_2 --max-steps 25
 ```
 
----
+## Usage
 
-## 🏥 Agent Loop Design
+* **Upload Patient Records:** Upload a single patient PDF or a `.zip` archive containing a folder of patient records (admission notes, progress notes, lab results).
+* **Track Extraction:** View the real-time planner running through its multi-step agentic loop reporting reasoning logs.
+* **Audit & Reconcile:** Inspect the conflicts panel to resolve medication or diagnostic inconsistencies.
+* **Export Summary:** Click download to generate a print-ready PDF summary for patient handoff.
 
-The agent uses a state-driven planning loop rather than a hardcoded pipeline. After executing each step, the planner (`agent/planner.py`) evaluates the current state and decides which tool to run next.
+## Project Structure
 
-```mermaid
-graph TD
-    A[Start: Patient PDF] --> B[1. read_pdfs]
-    B --> C[2. Extract demographics, diagnoses, meds, labs, procedures]
-    C --> D[3. detect_conflicts]
-    D --> E[4. check_drug_interactions]
-    E --> F[5. reconcile_medications]
-    F --> G[6. build_summary]
-    G --> H[End: HTML Report & step_trace.json]
+```
+discharge_summary_agent/
+├── agent/
+│   ├── loop.py               # Main agent execution loop
+│   ├── state.py              # Agent state tracker
+│   ├── tracer.py             # Execution tracer
+│   ├── reviewer.py           # Doctor edit simulator (Phase 2)
+│   ├── feedback.py           # Draft scoring module (Phase 2)
+│   ├── correction_memory.py  # Persistent learning store (Phase 2)
+│   └── evaluate.py           # Evaluation runner CLI
+├── extractors/
+│   ├── demographics.py       # Demographic and allergy extraction
+│   ├── diagnoses.py          # Principal & secondary diagnoses extraction
+│   ├── medications.py        # Admission, inpatient & discharge meds extraction
+│   ├── labs.py               # Lab and vital results extraction
+│   ├── procedures.py         # Surgical and procedural extraction
+│   ├── discharge_info.py     # Discharge disposition & follow-up extraction
+│   └── hospital_course.py    # Hospital course narrative extraction
+├── tools/
+│   ├── pdf_reader.py         # Digital PDF parsing & multi-fallback OCR
+│   ├── conflict_detector.py  # Clinical conflict and inconsistency auditor
+│   ├── drug_interaction.py   # Drug-to-drug interaction checker
+│   ├── escalation.py         # Clinician flagging and review router
+│   └── hallucination_check.py# Hallucination Shield verification
+├── output/
+│   ├── html_report.py        # HTML summary generator
+│   ├── pdf_report.py         # Print-ready PDF compiler
+│   └── summary_builder.py    # Core summary drafting and reconciliation
+├── templates/
+│   └── ui.html               # Frontend dashboard template
+├── app.py                    # Flask web interface
+├── main.py                   # Command-line runner
+└── requirements.txt          # Python dependencies
 ```
 
----
+## Roadmap
 
-## 🛡️ Clinical Safety & Guardrails
+* [x] Multi-step agentic state machine pipeline
+* [x] Automated clinical conflict detection
+* [x] Fallback OCR extraction (EasyOCR & Gemini Vision)
+* [x] Print-ready PDF report generation
+* [x] Persistent doctor-correction memory (Phase 2)
+* [ ] Multi-tenant role-based clinician access control
+* [ ] Direct FHIR/HL7 electronic health record (EHR) integration
+* [ ] Live collaborative draft editing interface
 
-### 1. No-Fabrication Guardrail
-- **Refusal to Guess**: System instructions explicitly restrict the model from inventing any clinical fact. If information is not found, the model must return `null` or `[PENDING]`.
-- **Clinician Review Mapping**: Any unextracted field is rendered as `—` (Not Documented) and flagged visually on the dashboard to force manual verification.
+## Contributing
 
-### 2. Failure Handling
-- **Tenacious Retries**: All LLM calls are wrapped with exponential backoff retries (`tenacity`) to handle network timeouts.
-- **Quota Fail-Safe**: If the API key hits quota limits (429 errors), the loop terminates early and alerts the user rather than silently producing incomplete reports.
+Please submit issues and pull requests to the main repository. Ensure all tests and mock runs pass before proposing changes.
 
-### 3. Conflict & Inconsistency Handling
-- **Cross-Document Auditing**: `tools/conflict_detector.py` checks for mismatched discharge dates, conflicting diagnoses, and discharge status (e.g. standard discharge vs. Left Against Medical Advice). Conflicts are escalated directly to the reviewer.
+## License
 
----
-
-## 🔮 Limitations & Future Work
-
-- **Rate Limits**: The Gemini free tier is subject to strict limits (20 requests/day). Upgrading to a pay-as-you-go key removes this bottleneck.
-- **Context Chunking**: For exceptionally long hospital stays (+100 pages), pre-filtering pages using keyword matches (e.g., searching for "Discharge", "Medication List", "Course") will optimize token usage.
+Distributed under the Apache License 2.0. See `LICENSE` for details.

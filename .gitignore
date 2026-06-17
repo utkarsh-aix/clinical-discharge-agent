@@ -18,6 +18,7 @@ discharge_summary_agent/.env
 
 # Scratch and input/output directories
 scratch_ocr/
+discharge_summary_agent/scratch/
 discharge_summary_agent/uploads/
 discharge_summary_agent/outputs/
 discharge_summary_agent/patients/
@@ -26,3 +27,11 @@ discharge_summary_agent/patients/
 .DS_Store
 .vscode/
 .idea/
+
+# Archives / Backups
+*.zip
+*.tar.gz
+*.tgz
+
+# Log files
+*.log

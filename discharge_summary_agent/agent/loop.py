@@ -35,27 +35,31 @@ class DischargeAgent:
         if s.labs is None:                              return "extract_labs"
         if s.procedures is None:                        return "extract_procedures"
         if s.discharge_info_raw is None:                return "extract_discharge_info"
+        if s.hospital_course is None:                   return "extract_hospital_course"
+        if s.medication_reconciliation is None:         return "reconcile_medications"
         if s.conflicts_detected is None and s.diagnoses_raw: return "detect_conflicts"
         if s.drug_interactions is None:                 return "check_drug_interactions"
         if s.conflicts_detected and not s.flags_for_review: return "escalate_conflicts"
-        if s.medication_reconciliation is None:         return "reconcile_medications"
         if s.final_summary is None:                     return "build_summary"
+        if not getattr(s, "hallucination_checked", False): return "verify_summary"
         return "complete"
 
     def explain_why(self, tool: str) -> str:
         explanations = {
             "read_pdfs": "No text extracted yet. Reading all PDFs in patient folder first.",
-            "extract_demographics": "Text available. Extracting patient demographics.",
+            "extract_demographics": "Text available. Extracting patient demographics and allergy information.",
             "extract_diagnoses": "Demographics done. Extracting all diagnosis mentions - will check for conflicts.",
             "extract_medications": "Diagnoses extracted. Extracting admission, inpatient, and discharge medications.",
             "extract_labs": "Medications extracted. Extracting all laboratory and imaging results.",
             "extract_procedures": "Labs extracted. Extracting procedures performed.",
             "extract_discharge_info": "Procedures done. Extracting discharge condition and follow-up.",
-            "detect_conflicts": "All data extracted. Checking for conflicts across documents.",
+            "extract_hospital_course": "Discharge info extracted. Extracting hospital course narrative from progress notes.",
+            "reconcile_medications": "Hospital course extracted. Reconciling admission vs discharge medications.",
+            "detect_conflicts": "Medication reconciliation done. Checking for conflicts across all documents.",
             "check_drug_interactions": "Conflicts checked. Running mock drug interaction check.",
             "escalate_conflicts": f"Found {len(self.state.conflicts_detected or [])} conflicts. Escalating to clinician review flags.",
-            "reconcile_medications": "Interactions checked. Reconciling admission vs discharge medications.",
             "build_summary": "All data gathered. Building final discharge summary draft.",
+            "verify_summary": "Summary built. Running Hallucination Shield to cross-check values against source PDFs.",
         }
         return explanations.get(tool, f"Executing {tool}")
 
@@ -72,6 +76,43 @@ class DischargeAgent:
             reasoning = self.explain_why(next_tool)
             result = {}
 
+            # Construct tool inputs for tracing
+            inputs = {}
+            s = self.state
+            if next_tool == "read_pdfs":
+                inputs = {"patient_folder": s.patient_folder}
+            elif next_tool in ["extract_demographics", "extract_diagnoses", "extract_medications", 
+                               "extract_labs", "extract_procedures", "extract_discharge_info", "extract_hospital_course"]:
+                inputs = {"raw_text_length": len(s.raw_text or "")}
+            elif next_tool == "detect_conflicts":
+                inputs = {
+                    "diagnoses_raw": s.diagnoses_raw,
+                    "admission_medications": s.admission_medications,
+                    "discharge_medications": s.discharge_medications,
+                    "medication_reconciliation": s.medication_reconciliation
+                }
+            elif next_tool == "check_drug_interactions":
+                inputs = {"discharge_medications": s.discharge_medications}
+            elif next_tool == "reconcile_medications":
+                inputs = {
+                    "admission_medications": s.admission_medications,
+                    "discharge_medications": s.discharge_medications,
+                    "inpatient_medications": s.inpatient_medications
+                }
+            elif next_tool == "build_summary":
+                inputs = {
+                    "demographics": s.demographics,
+                    "principal_diagnosis": s.principal_diagnosis,
+                    "secondary_diagnoses": s.secondary_diagnoses,
+                    "hospital_course": s.hospital_course,
+                    "procedures": s.procedures,
+                    "labs": s.labs,
+                    "discharge_medications": s.discharge_medications,
+                    "allergies": s.allergies,
+                    "conflicts_detected": s.conflicts_detected,
+                    "flags_for_review": s.flags_for_review
+                }
+
             try:
                 result = self._execute(next_tool)
                 if isinstance(result, dict) and "error" in result:
@@ -84,14 +125,14 @@ class DischargeAgent:
                 err_msg = str(e)
                 if any(kw in err_msg.lower() for kw in ["quota", "429", "api key", "key", "resource_exhausted"]):
                     self.state.status = "error"
-                    self.tracer.log_step(reasoning, next_tool, {}, {"error": err_msg}, "error")
+                    self.tracer.log_step(reasoning, next_tool, inputs, {"error": err_msg}, "error")
                     raise e
                 result = {"error": str(e), "details": "Exception in tool execution"}
 
             self._update_state(next_tool, result)
 
             next_decision = self.plan()
-            self.tracer.log_step(reasoning, next_tool, {}, result, next_decision)
+            self.tracer.log_step(reasoning, next_tool, inputs, result, next_decision)
             self.state.current_step += 1
 
         if self.state.current_step >= self.state.max_steps:
@@ -106,7 +147,48 @@ class DischargeAgent:
                     f"SUMMARY BUILD FAILED: {e}\n\nPartial data:\n{str(self.state)}"
                 )
 
+        # ── Phase 2: Run simulated review + update correction memory ─────────
+        self._run_phase2_learning()
+
         return self.state
+
+    def _run_phase2_learning(self) -> None:
+        """
+        Phase 2 hook: apply simulated doctor review, score the draft,
+        and feed corrections back into the persistent memory store.
+        Called automatically after every successful summary build.
+        """
+        if not self.state.final_summary:
+            return
+        try:
+            from agent.reviewer import apply_doctor_edits, get_edit_pairs
+            from agent.feedback import score_draft
+            from agent.correction_memory import record_corrections, get_confirmed_rule_count
+
+            draft = self.state.final_summary
+            edited = apply_doctor_edits(draft)
+            pairs = get_edit_pairs(draft)
+
+            iteration = self.state.current_step  # proxy for iteration count
+            score = score_draft(draft, edited, self.state.patient_id, iteration)
+
+            # Store score on state for web UI display
+            self.state.phase2_score = {
+                "ned": score["normalized_edit_distance"],
+                "smr": score["section_match_rate"],
+                "confirmed_rules": get_confirmed_rule_count(),
+            }
+
+            record_corrections(pairs)
+            new_count = get_confirmed_rule_count()
+            if new_count > 0:
+                self.state.flags_for_review.append(
+                    f"[Phase 2] {new_count} confirmed correction rules in memory. "
+                    f"Normalized Edit Distance: {score['normalized_edit_distance']:.4f}"
+                )
+        except Exception as e:
+            # Phase 2 is non-critical — never crash the main agent
+            pass
 
     def _execute(self, tool: str) -> dict:
         s = self.state
@@ -121,6 +203,7 @@ class DischargeAgent:
             s.documents_found = pdfs
             all_text = []
             total_ocr = 0
+            all_conf_scores = []
             # Use pre-rendered text/images from scratch_ocr/ if they exist
             possible_caches = [
                 os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "scratch_ocr")),
@@ -139,15 +222,18 @@ class DischargeAgent:
                     all_text.append(get_full_text(result))
                     stats = get_ocr_stats(result)
                     total_ocr += stats["ocr_pages"]
+                    all_conf_scores.append(stats["avg_ocr_confidence"])
                 else:
                     s.documents_failed.append(pdf_path)
             s.raw_text = "\n\n".join(all_text)
+            s.ocr_confidence = round(sum(all_conf_scores) / len(all_conf_scores), 1) if all_conf_scores else 100.0
             return {
                 "pdfs_found": len(pdfs),
                 "pdfs_read": len(s.documents_read),
                 "total_text_chars": len(s.raw_text),
                 "ocr_pages_processed": total_ocr,
                 "cache_used": image_cache is not None,
+                "ocr_confidence": s.ocr_confidence,
             }
 
         elif tool == "extract_demographics":
@@ -172,6 +258,10 @@ class DischargeAgent:
             result = extract_discharge_info(s.raw_text)
             s.discharge_info_raw = result
             return result
+
+        elif tool == "extract_hospital_course":
+            from extractors.hospital_course import extract_hospital_course
+            return extract_hospital_course(s.raw_text)
 
         elif tool == "detect_conflicts":
             return detect_conflicts(s)
@@ -203,6 +293,11 @@ class DischargeAgent:
             summary_text = build_discharge_summary(s)
             return {"summary": summary_text}
 
+        elif tool == "verify_summary":
+            from tools.hallucination_check import verify_summary
+            result = verify_summary(s.final_summary or "", s.raw_text or "")
+            return result
+
         return {"error": f"unknown_tool: {tool}"}
 
     def _update_state(self, tool: str, result: dict):
@@ -232,6 +327,9 @@ class DischargeAgent:
                 s.discharge_info_raw = {}
                 s.discharge_condition = None
                 s.follow_up_instructions = None
+            elif tool == "extract_hospital_course":
+                s.hospital_course = ""
+                s.hospital_course_events = []
             elif tool == "detect_conflicts":
                 s.conflicts_detected = []
             elif tool == "check_drug_interactions":
@@ -248,6 +346,7 @@ class DischargeAgent:
             s.demographics = result
             s.admission_date = result.get("admission_date")
             s.discharge_date = result.get("discharge_date")
+            s.allergies = result.get("allergies")
 
         elif tool == "extract_diagnoses":
             s.principal_diagnosis = result.get("principal_diagnosis")
@@ -271,6 +370,10 @@ class DischargeAgent:
             if result.get("pending_results_at_discharge"):
                 s.pending_results = (s.pending_results or []) + result["pending_results_at_discharge"]
 
+        elif tool == "extract_hospital_course":
+            s.hospital_course = result.get("hospital_course")
+            s.hospital_course_events = result.get("key_events", [])
+
         elif tool == "detect_conflicts":
             s.conflicts_detected = result if isinstance(result, list) else []
 
@@ -285,3 +388,15 @@ class DischargeAgent:
 
         elif tool == "build_summary":
             s.final_summary = result.get("summary", "")
+
+        elif tool == "verify_summary":
+            s.hallucination_checked = True
+            flags = result.get("hallucination_flags", [])
+            if flags:
+                # Merge hallucination flags into conflicts so they show in the HTML report
+                existing = s.conflicts_detected or []
+                s.conflicts_detected = existing + flags
+                s.flags_for_review.append(
+                    f"[Hallucination Shield] {len(flags)} unverified value(s) in summary — manual review required."
+                )
+
