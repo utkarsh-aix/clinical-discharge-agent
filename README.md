@@ -28,27 +28,27 @@ CliniDraft AI solves this by deploying a deterministic state-machine agent power
 
 ### 1. Document Upload Page
 Provides a simple web portal for uploading single patient PDFs or ZIP archives containing multi-document patient records.
-![Document Upload Page](discharge_summary_agent/screenshots/document_upload.png)
+![Document Upload Page](screenshots/document_upload.png)
 
 ### 2. Document Analysis & Execution Trace
 Displays the real-time planner running through its multi-step agentic loop and reporting reasoning logs.
-![Document Analysis](discharge_summary_agent/screenshots/document_analysis.png)
+![Document Analysis](screenshots/document_analysis.png)
 
 ### 3. Main Dashboard & Patient Info Page
 Visual overview of demographics, extracted diagnoses, and metrics including steps taken, conflicts found, and procedures completed.
-![Main Dashboard](discharge_summary_agent/screenshots/dashboard_main.png)
+![Main Dashboard](screenshots/dashboard_main.png)
 
 ### 4. Key Investigations Page
 Extracts, structures, and maps lab results and vital statistics into clear tabular formats.
-![Key Investigations](discharge_summary_agent/screenshots/dashboard_investigations.png)
+![Key Investigations](screenshots/dashboard_investigations.png)
 
 ### 5. Medications, Procedures & Discharge Info Page
 Captures all prescriptions, route, frequency, and duration alongside critical follow-up plans.
-![Medications and Procedures](discharge_summary_agent/screenshots/dashboard_meds_procedures.png)
+![Medications and Procedures](screenshots/dashboard_meds_procedures.png)
 
 ### 6. Clinical Safety & Conflicts Panel
 Highlights cross-document inconsistencies (LAMA status, diagnosis mismatches) and medication reconciliation flags for direct clinician review.
-![Clinical Safety](discharge_summary_agent/screenshots/dashboard_conflicts.png)
+![Clinical Safety](screenshots/dashboard_conflicts.png)
 
 ## Tech Stack
 
