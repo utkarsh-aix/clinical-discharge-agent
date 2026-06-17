@@ -118,9 +118,14 @@ class DischargeAgent:
                 if isinstance(result, dict) and "error" in result:
                     err_msg = str(result.get("details", "")) + " " + str(result.get("error", ""))
                     if any(kw in err_msg.lower() for kw in ["429", "quota", "limit", "resource_exhausted"]):
-                        raise RuntimeError(f"Gemini API Quota Exceeded (429). Please verify your API key limits or billing details: {err_msg}")
+                        # Phase 4: log full error server-side; raise clean message to avoid leaking details
+                        import logging
+                        logging.getLogger(__name__).error("Gemini quota error: %s", err_msg)
+                        raise RuntimeError("Gemini API quota exceeded. Please check your billing or wait before retrying.")
                     if any(kw in err_msg.lower() for kw in ["400", "invalid api key", "api_key_invalid", "key not found"]):
-                        raise RuntimeError(f"Invalid Gemini API Key. Please check the API key in your .env file: {err_msg}")
+                        import logging
+                        logging.getLogger(__name__).error("Gemini auth error: %s", err_msg)
+                        raise RuntimeError("Gemini API authentication failed. Please check the API key in your .env file.")
             except Exception as e:
                 err_msg = str(e)
                 if any(kw in err_msg.lower() for kw in ["quota", "429", "api key", "key", "resource_exhausted"]):

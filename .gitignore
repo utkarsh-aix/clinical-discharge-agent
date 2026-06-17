@@ -35,3 +35,22 @@ discharge_summary_agent/patients/
 
 # Log files
 *.log
+
+# Pickle files — never commit (RCE risk if loaded from untrusted source)
+*.pkl
+*.pickle
+
+# Accidental pip shell-redirect files (e.g. =3.5.0 created by unquoted pip install)
+=*
+
+# Flask-Limiter local storage (in-memory by default, but if file backend is used)
+flask_limiter_storage/
+
+# Patient data / PHI — belt-and-suspenders on top of outputs/ rule
+discharge_summary_agent/**/*.json
+!discharge_summary_agent/requirements*.json
+
+# Test / temporary files
+*.tmp
+*.bak
+.DS_Store

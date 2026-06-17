@@ -40,7 +40,6 @@ def _summarise_page(page_text: str, api_key: str) -> str:
         url = (
             "https://generativelanguage.googleapis.com/v1beta/"
             "models/gemini-2.5-flash-lite:generateContent"
-            f"?key={api_key}"
         )
         payload: Dict[str, Any] = {
             "contents": [{"parts": [{"text": page_text[:3000]}]}],
@@ -50,7 +49,10 @@ def _summarise_page(page_text: str, api_key: str) -> str:
         resp = requests.post(
             url,
             json=payload,
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "x-goog-api-key": api_key,   # Phase 3: key in header, not URL
+            },
             timeout=30,
         )
         if resp.status_code == 200:
@@ -226,7 +228,7 @@ def _call_gemini_api_single(
 
     url = (
         f"https://generativelanguage.googleapis.com/v1beta/"
-        f"models/{model_name}:generateContent?key={api_key}"
+        f"models/{model_name}:generateContent"
     )
 
     generation_config: Dict[str, Any] = {
@@ -243,7 +245,10 @@ def _call_gemini_api_single(
         "systemInstruction": {"parts": [{"text": system_prompt}]},
         "generationConfig": generation_config,
     }
-    headers = {"Content-Type": "application/json"}
+    headers = {
+        "Content-Type": "application/json",
+        "x-goog-api-key": api_key,   # Phase 3: key in header, not URL query param
+    }
     response = requests.post(url, json=payload, headers=headers, timeout=60)
 
     if response.status_code == 429:

@@ -1,4 +1,5 @@
 from datetime import datetime
+import html
 import json
 import os
 
@@ -97,7 +98,7 @@ def _build_diff_viewer(state) -> str:
     html_tokens = []
     for token in diff:
         code = token[:2]
-        word = token[2:]
+        word = html.escape(token[2:])  # XSS fix: escape raw OCR/LLM text
         if code == "  ":   # unchanged
             html_tokens.append(f"<span>{word}</span>")
         elif code == "+ ":  # added in summary
@@ -145,7 +146,7 @@ def generate_html_report(state, output_path: str = None) -> str:
         ocr_badge = '<span class="badge badge-ok"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-2px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Digital PDF</span>'
 
     def val(v, fallback="—"):
-        return str(v) if v else fallback
+        return html.escape(str(v)) if v else fallback
 
     def med_rows(meds):
         if not meds:
@@ -153,35 +154,46 @@ def generate_html_report(state, output_path: str = None) -> str:
         rows = ""
         for m in meds:
             if isinstance(m, dict):
-                rows += f"<tr><td>{m.get('name','—')}</td><td>{m.get('dose','—')}</td><td>{m.get('route','—')}</td><td>{m.get('frequency','—')}</td><td>{m.get('duration') or m.get('dates','—')}</td></tr>"
+                name = html.escape(str(m.get('name', '—')))
+                dose = html.escape(str(m.get('dose', '—')))
+                route = html.escape(str(m.get('route', '—')))
+                freq = html.escape(str(m.get('frequency', '—')))
+                dur = html.escape(str(m.get('duration') or m.get('dates', '—')))
+                rows += f"<tr><td>{name}</td><td>{dose}</td><td>{route}</td><td>{freq}</td><td>{dur}</td></tr>"
         return rows
 
     def conflict_cards(items):
         if not items:
             return '<div class="ok-badge">✓ No conflicts detected</div>'
-        html = ""
+        h = ""
         for c in items:
-            sev = c.get("severity", "low")
-            html += f"""<div class="conflict-card sev-{sev}">
+            sev = html.escape(str(c.get("severity", "low")))
+            ctype = html.escape(c.get("conflict_type", "").replace("_", " ").title())
+            desc = html.escape(str(c.get("description", "")))
+            action = html.escape(str(c.get("action_required", "Clinician review required")))
+            h += f"""<div class="conflict-card sev-{sev}">
   <span class="sev-tag">{sev.upper()}</span>
-  <strong>{c.get('conflict_type','').replace('_',' ').title()}</strong>
-  <p>{c.get('description','')}</p>
-  <div class="action">→ {c.get('action_required','Clinician review required')}</div>
+  <strong>{ctype}</strong>
+  <p>{desc}</p>
+  <div class="action">→ {action}</div>
 </div>"""
-        return html
+        return h
 
     def ix_cards(items):
         if not items:
             return '<div class="ok-badge">✓ No interactions flagged</div>'
-        html = ""
+        h = ""
         for ix in items:
-            sev = ix.get("severity", "low")
-            html += f"""<div class="conflict-card sev-{sev}">
+            sev = html.escape(str(ix.get("severity", "low")))
+            drug_a = html.escape(str(ix.get("drug_a", "")).title())
+            drug_b = html.escape(str(ix.get("drug_b", "")).title())
+            desc = html.escape(str(ix.get("description", "")))
+            h += f"""<div class="conflict-card sev-{sev}">
   <span class="sev-tag">{sev.upper()}</span>
-  <strong>{ix.get('drug_a','').title()} + {ix.get('drug_b','').title()}</strong>
-  <p>{ix.get('description','')}</p>
+  <strong>{drug_a} + {drug_b}</strong>
+  <p>{desc}</p>
 </div>"""
-        return html
+        return h
 
     labs = state.labs or {}
     cbc = labs.get("cbc", {}) or {}

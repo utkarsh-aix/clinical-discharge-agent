@@ -32,10 +32,20 @@ def run_patient(patient_folder: str, patient_id: str, max_steps: int = 25):
     trace_path = f"outputs/{patient_id}_trace.json"
     agent.tracer.export_trace(trace_path)
 
-    # Save state pickle
-    import pickle
-    with open(f"outputs/{patient_id}_state.pkl", "wb") as f:
-        pickle.dump(state, f)
+    # Save state as JSON (pickle removed — RCE risk)
+    import json
+    state_data = {
+        "patient_id": state.patient_id,
+        "status": state.status,
+        "current_step": state.current_step,
+        "principal_diagnosis": state.principal_diagnosis,
+        "secondary_diagnoses": state.secondary_diagnoses or [],
+        "demographics": state.demographics or {},
+        "conflicts_detected": len(state.conflicts_detected or []),
+        "flags_for_review": len(state.flags_for_review or []),
+    }
+    with open(f"outputs/{patient_id}_state.json", "w") as f:
+        json.dump(state_data, f, indent=2)
 
     print(f"\n{'='*60}")
     print(f"✅ Status:    {state.status}")

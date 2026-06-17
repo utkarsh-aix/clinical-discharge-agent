@@ -409,7 +409,7 @@ def _ocr_page_vision(
 
         url = (
             "https://generativelanguage.googleapis.com/v1beta/"
-            f"models/gemini-1.5-pro:generateContent?key={api_key}"
+            "models/gemini-1.5-pro:generateContent"
         )
         payload = {
             "contents": [
@@ -428,7 +428,11 @@ def _ocr_page_vision(
             "systemInstruction": {"parts": [{"text": prompt}]},
             "generationConfig": {"temperature": 0.0},
         }
-        headers = {"Content-Type": "application/json"}
+        # Phase 3: API key in header, not URL query param (prevents key logging)
+        headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": api_key,
+        }
         response = requests.post(url, json=payload, headers=headers, timeout=90)
 
         if response.status_code != 200:

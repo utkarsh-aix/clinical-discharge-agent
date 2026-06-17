@@ -125,6 +125,10 @@ def get_prompt_injection(top_n: int = 8) -> str:
     Build a prompt snippet containing the top confirmed correction rules
     to inject into the LLM system prompt.
 
+    Phase 4 — Prompt Injection Guard:
+    All rules are validated for type, length, and content before injection.
+    Malformed or oversized records are silently dropped.
+
     Args:
         top_n: Maximum number of rules to inject.
 
@@ -132,8 +136,24 @@ def get_prompt_injection(top_n: int = 8) -> str:
         A formatted string block ready to append to system prompts.
         Returns empty string if no confirmed rules exist yet.
     """
+    _MAX_RULE_LEN = 200  # max chars per field to prevent prompt hijacking
+    _FORBIDDEN = ["\n", "system:", "user:", "assistant:", "<", ">"]
+
+    def _is_safe(s: str) -> bool:
+        """Reject strings that are too long or contain prompt-injection patterns."""
+        if not isinstance(s, str) or len(s) > _MAX_RULE_LEN:
+            return False
+        sl = s.lower()
+        return not any(f in sl for f in _FORBIDDEN)
+
     memory = _load_memory()
-    confirmed = [r for r in memory if r.get("confirmed", False)]
+    confirmed = [
+        r for r in memory
+        if r.get("confirmed", False)
+        and _is_safe(r.get("original", ""))
+        and _is_safe(r.get("corrected", ""))
+        and _is_safe(r.get("rule_summary", ""))
+    ]
 
     if not confirmed:
         return ""
